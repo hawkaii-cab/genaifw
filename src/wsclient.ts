@@ -32,8 +32,8 @@ import type { ClientEvent, WSServerMessage, ServerAction } from "./types";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const WS_URL = process.env.WS_URL ?? "ws://34.124.247.222:3001";
-// const WS_URL = process.env.WS_URL ?? "ws://localhost:4001";
+// const WS_URL = process.env.WS_URL ?? "ws://34.124.247.222:3001";
+const WS_URL = process.env.WS_URL ?? "ws://localhost:3001";
 let sessionId = process.env.SESSION_ID ?? `cli-test-${Date.now()}`;
 
 // ─── ANSI colours ────────────────────────────────────────────────────────────

@@ -8,15 +8,12 @@ import { getFeatureFromRegistry } from "./registry";
 import { getSession, newSession, saveSession } from "./store";
 import { resolve, BASE_TOOLS } from "./agent";
 import {
-    searchTrips,
-    searchLeads,
     validateIndianCity,
     checkDriverRating,
     logIntent,
     getAudioUrl,
     getAudioUrlDirect,
 } from "./services";
-import { logSearchToFirestore } from "./firebase";
 
 //  Post-Processor System
 
@@ -218,8 +215,6 @@ async function dutiesPostProcessor(
     }
 
     // Validate India
-    let pickupCoords: [number, number] | null = null;
-    let usedGeo = false;
 
     if (!pickupEmpty) {
         const v = await validateIndianCity(fromCity);
@@ -230,8 +225,7 @@ async function dutiesPostProcessor(
             ];
         }
         if (v.coordinates) {
-            pickupCoords = v.coordinates;
-            usedGeo = true;
+            // Coordinates are intentionally ignored for duties payload
         }
     }
 
@@ -243,48 +237,6 @@ async function dutiesPostProcessor(
                 { type: "navigate", screen: "end" },
             ];
         }
-    }
-
-    // Search trips + leads in parallel
-    const [trips, leads] = await Promise.all([
-        searchTrips({
-            pickupCity: fromCity,
-            dropCity: toCity,
-            pickupCoordinates: pickupCoords,
-        }).catch(() => [] as Record<string, unknown>[]),
-        searchLeads({
-            pickupCity: fromCity,
-            dropCity: toCity,
-            pickupCoordinates: pickupCoords,
-        }).catch(() => [] as Record<string, unknown>[]),
-    ]);
-
-    // Log search to Firestore
-    if (session.driverProfile?.id) {
-        logSearchToFirestore({
-            driverId: session.driverProfile.id,
-            pickupCity: fromCity || undefined,
-            dropCity: toCity || undefined,
-            usedGeo,
-            tripsCount: trips.length,
-            leadsCount: leads.length,
-        }).catch(() => {});
-    }
-
-    // No results
-    if (trips.length === 0 && leads.length === 0) {
-        return [
-            { type: "playAudio", key: "no_duty" },
-            {
-                type: "uiAction",
-                action: "show_duties_list",
-                data: {
-                    trips: [],
-                    leads: [],
-                    query: { pickup_city: fromCity, drop_city: toCity },
-                },
-            },
-        ];
     }
 
     // Pick audio key
@@ -299,19 +251,15 @@ async function dutiesPostProcessor(
 
     for (let i = 0; i < actions.length; i++) {
         if (i === dutiesIdx) {
-            // Enrich duties action with search results
+            // Enrich duties action with query info
             result.push({
                 type: "uiAction",
                 action: dutiesAction.action,
                 data: {
-                    trips,
-                    leads,
                     query: {
                         pickup_city: fromCity,
                         drop_city: toCity,
-                        used_geo: usedGeo,
                     },
-                    counts: { trips: trips.length, leads: leads.length },
                 },
             });
         } else if (!audioAdded && actions[i]!.type === "speak") {
